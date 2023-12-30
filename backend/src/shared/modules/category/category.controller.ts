@@ -1,0 +1,83 @@
+import { inject, injectable } from 'inversify';
+import { Request, Response } from 'express';
+import {
+  BaseController,
+  HttpError,
+  HttpMethod,
+  PrivateRouteMiddleware,
+  RequestQuery,
+  ValidateDtoMiddleware,
+  ValidateObjectIdMiddleware,
+} from '../../libs/rest/index.js';
+import { Logger } from '../../libs/logger/index.js';
+import { Component } from '../../types/index.js';
+import { ICategoryService } from './category-service.interface.js';
+import { fillDTO } from '../../helpers/index.js';
+import { CategoryRdo } from './rdo/category.rdo.js';
+import { CreateCategoryDto } from './dto/create-category.dto.js';
+import { StatusCodes } from 'http-status-codes';
+import { OfferRdo, IOfferService } from '../offer/index.js';
+import { ParamCategoryId } from './type/param-categoryid.type.js';
+
+@injectable()
+export class CategoryController extends BaseController {
+  constructor(
+    @inject(Component.Logger) protected readonly logger: Logger,
+    @inject(Component.CategoryService) private readonly categoryService: ICategoryService,
+    @inject(Component.OfferService) private readonly offerService: IOfferService,
+  ) {
+    super(logger);
+
+    this.logger.info('Register routes for CategoryController…');
+
+    this.addRoute({ path: '/', method: HttpMethod.Get, handler: this.index });
+    this.addRoute({
+      path: '/',
+      method: HttpMethod.Post,
+      handler: this.create,
+      middlewares: [
+        new PrivateRouteMiddleware(),
+        new ValidateDtoMiddleware(CreateCategoryDto)
+      ]
+    });
+    this.addRoute({
+      path: '/:categoryId/offers',
+      method: HttpMethod.Get,
+      handler: this.getOffersFromCategory,
+      middlewares: [new ValidateObjectIdMiddleware('categoryId')]
+    });
+  }
+
+  public async index(_req: Request, res: Response): Promise<void> {
+    const categories = await this.categoryService.find();
+    const responseData = fillDTO(CategoryRdo, categories);
+    this.ok(res, responseData);
+  }
+
+  public async create(
+    { body }: Request<Record<string, unknown>, Record<string, unknown>, CreateCategoryDto>,
+    res: Response
+  ): Promise<void> {
+
+    const existCategory = await this.categoryService.findByCategoryName(body.name);
+
+    if (existCategory) {
+      throw new HttpError(
+        StatusCodes.UNPROCESSABLE_ENTITY,
+        `Category with name «${body.name}» exists.`,
+        'CategoryController'
+      );
+    }
+
+    const result = await this.categoryService.createCategory(body);
+    this.created(res, fillDTO(CategoryRdo, result));
+  }
+
+  public async getOffersFromCategory(
+    { params, query } : Request<ParamCategoryId, unknown, unknown, RequestQuery>,
+    res: Response,
+  ):Promise<void> {
+    const offers = await this.offerService.findByCategoryId(params.categoryId, query.limit);
+    this.ok(res, fillDTO(OfferRdo, offers));
+  }
+}

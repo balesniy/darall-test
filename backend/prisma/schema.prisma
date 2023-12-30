@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Offer {
+  offerId     Int        @id @default(autoincrement()) @map("offer_id")
+  categories  Category[]
+  title       String     @default("")
+  description String     @default("")
+  image       String     @default("")
+  price       Int
+  createdAt   DateTime   @default(now()) @map("created_at")
+  publishAt   DateTime   @updatedAt @map("publish_at")
+  userId      Int?       @map("user_id")
+
+  @@map("offers")
+}
+
+model Category {
+  categoryId  Int     @id @default(autoincrement()) @map("category_id")
+  name        String
+  description String
+  offers      Offer[]
+
+  @@map("categories")
+}
+
+model User {
+  userId       Int    @id @default(autoincrement()) @map("user_id")
+  email        String
+  passwordHash String @map("password_hash")
+
+  @@map("users")
+}

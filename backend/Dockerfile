@@ -1,0 +1,30 @@
+# Check out https://hub.docker.com/_/node to select a new base image
+FROM node:20-slim
+RUN apt-get update && apt-get install -y openssl
+
+# Set to a non-root built-in user `node`
+USER node
+
+# Create app directory (with user `node`)
+RUN mkdir -p /home/node/app
+
+WORKDIR /home/node/app
+
+
+# Install app dependencies
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# where available (npm@5+)
+COPY --chown=node package*.json ./
+
+RUN npm ci
+
+# Bundle app source code
+COPY --chown=node . .
+
+# Bind to all network interfaces so that it can be mapped to the host OS
+ENV HOST=0.0.0.0 PORT=4000
+
+EXPOSE ${PORT}
+
+# Define the command to run the app
+CMD ["npm", "start"]
